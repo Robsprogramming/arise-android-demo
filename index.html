@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base href="/arise-android-demo/">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Live in-browser demo of Arise & Set's Android edition - science-backed morning, daily, and evening wellness routines.">
+  <meta name="theme-color" content="#0D0D1A">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Arise &amp; Set">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/Icon-192.png">
+
+  <meta property="og:title" content="Arise &amp; Set - Android edition, live demo">
+  <meta property="og:description" content="The Flutter/Android build of Arise & Set, running in your browser.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://robsprogramming.github.io/arise-android-demo/">
+
+  <title>Arise &amp; Set - Android demo</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root { --bezel: #14141f; --ink: #e7e4f2; --muted: #8b86a6; }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%; margin: 0; padding: 0;
+      background: #0D0D1A; color: var(--ink);
+      font-family: "Outfit", "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      overscroll-behavior: none;
+    }
+
+    /* Ambient dawn/dusk wash - warm sunrise top-left, cool dusk bottom-right. */
+    body::before {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(65vw 65vh at 10% 6%,  rgba(255, 168, 84, 0.10), transparent 62%),
+        radial-gradient(65vw 65vh at 90% 94%, rgba(124, 92, 255, 0.13), transparent 62%);
+    }
+
+    /* ---- Default: full-bleed (phones, short windows) ---- */
+    .stage  { position: fixed; inset: 0; z-index: 1; }
+    .device { position: absolute; inset: 0; }
+    .screen { position: absolute; inset: 0; overflow: hidden; background: #0D0D1A; }
+    #app-host { position: absolute; inset: 0; }
+    .caption { display: none; }
+
+    /* ---- Desktop: centred phone frame ----
+       Thresholds are deliberately low: a maximised Chrome window on a 1080p
+       screen leaves only ~718px of viewport once tabs, address bar and the
+       bookmarks bar are taken out, so a 720px min-height silently falls back
+       to full-bleed on the most common desktop setup there is. */
+    @media (min-width: 760px) and (min-height: 560px) {
+      .stage {
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 20px;
+      }
+      .device {
+        position: relative; inset: auto;
+        /* Width is PINNED, never derived from the available height. On a
+           desktop the device pixel ratio is 1, so these CSS pixels are the
+           logical pixels Flutter lays out against: 412 is a Pixel-class
+           Android width. Deriving it from height (via aspect-ratio) starved
+           the app down to ~270px on a short window - narrower than any real
+           phone - which is what made the type look oversized and pushed the
+           bottom nav off screen. Only the height flexes. */
+        width: calc(412px + 26px);            /* screen + 13px bezel each side */
+        height: min(941px, calc(100dvh - 76px));  /* 915px screen + bezel */
+        padding: 13px;
+        border-radius: 50px;
+        background: linear-gradient(158deg, #24243a 0%, var(--bezel) 42%, #0b0b13 100%);
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.09),
+          0 2px 1px rgba(255, 255, 255, 0.16) inset,
+          0 44px 90px -22px rgba(0, 0, 0, 0.85),
+          0 0 120px -30px rgba(124, 92, 255, 0.45);
+      }
+      .screen { position: relative; inset: auto; height: 100%; width: 100%; border-radius: 38px; }
+      .caption { display: block; margin: 0; font-size: 13px; color: var(--muted); text-align: center; letter-spacing: 0.01em; }
+      .caption a { color: #b9aef5; text-decoration: none; border-bottom: 1px solid rgba(185, 174, 245, 0.3); }
+      .caption a:hover { color: #d6cfff; border-bottom-color: rgba(214, 207, 255, 0.6); }
+      .caption .dot { opacity: 0.4; margin: 0 8px; }
+    }
+
+    /* ---- Boot splash ---- */
+    .boot {
+      position: absolute; inset: 0; z-index: 2;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+      background: #0D0D1A;
+      transition: opacity 520ms ease;
+    }
+    .boot.done { opacity: 0; pointer-events: none; }
+    .boot img { width: 76px; height: 76px; border-radius: 19px; opacity: 0.95; }
+    .boot .name { font-size: 15px; letter-spacing: 0.16em; text-transform: uppercase; color: #cfc8ea; }
+    .boot .bar { width: 128px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+    .boot .bar i { display: block; width: 40%; height: 100%; border-radius: 3px;
+      background: linear-gradient(90deg, #ffa854, #7c5cff);
+      animation: slide 1.25s ease-in-out infinite; }
+    .boot .hint { font-size: 11.5px; color: #6f6a89; }
+    @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .boot .bar i { animation: none; width: 100%; }
+      .boot { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="device">
+      <div class="screen">
+        <div id="app-host"></div>
+        <div class="boot" id="boot">
+          <img src="icons/Icon-192.png" alt="">
+          <div class="name">Arise &amp; Set</div>
+          <div class="bar"><i></i></div>
+          <div class="hint">Loading the Android build&hellip;</div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">
+      Android edition (Flutter), running in your browser
+      <span class="dot">&bull;</span>
+      <a href="https://github.com/Robsprogramming/ariseandset-showcase">Engineering write-up</a>
+      <span class="dot">&bull;</span>
+      <a href="https://robsprogramming.github.io/arise-web-demo/">Web edition demo</a>
+    </p>
+  </div>
+
+  <script>
+    // Flutter fires this on the window once the first frame is rasterised.
+    window.addEventListener('flutter-first-frame', function () {
+      var boot = document.getElementById('boot');
+      if (!boot) return;
+      boot.classList.add('done');
+      setTimeout(function () { boot.remove(); }, 600);
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
